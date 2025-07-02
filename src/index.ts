@@ -4,10 +4,35 @@ import ky from "ky";
 import NodeCache from "node-cache";
 
 const DANBOORU_API = "https://danbooru.donmai.us";
-const TAG_LIMIT = 2;
-const PAGE_LIMIT = 200;
-const LOCAL_PAGE_SIZE = 2;
-const port = 14569;
+const TAG_LIMIT = +process.env.TAG_LIMIT || 2;
+const PAGE_LIMIT = +process.env.PAGE_LIMIT || 200;
+const LOCAL_PAGE_SIZE = +process.env.LOCAL_PAGE_SIZE || 2;
+const port = +process.argv[3] || +process.env.PORT || 14569;
+
+function flag(n: string, bit: Flags): boolean {
+    return n[bit] === "1";
+}
+
+enum Flags {
+    POSTS,
+    POSTS_DEBUG,
+    REDIRECT,
+}
+
+if (process.argv.includes("-h")) {
+    console.log(`Usage: ${process.argv[0]} ${process.argv[1]} [flags] [port]`);
+    let flags = "";
+    for (const key of Object.keys(Flags)) {
+        if (!isNaN(+key)) continue;
+        flags += `{${key}}`;
+    }
+    console.log("Flags:", flags);
+    console.log("E.g.:", "111,", "101,", "010");
+    process.exit(0);
+}
+
+let logs = process.argv[2] || process.env.LOGS || "0";
+if (logs.length < 3) logs = logs.padEnd(3, "0");
 
 const app = new FalconFrame();
 
@@ -50,12 +75,12 @@ async function getFilteredPage(allTags: string[], clientPage: number): Promise<a
         });
 
         const url = `${DANBOORU_API}/posts.json?${query}`;
-        console.log(`Fetching page ${danbooruPage} of ${primaryTags.join(",")}`);
+        if (flag(logs, Flags.POSTS_DEBUG)) console.log(`[D] Fetching page ${danbooruPage} of ${primaryTags.join(",")}`);
 
         const start = Date.now();
         const res = await ky(url);
         const end = Date.now();
-        console.log(`Fetch ${url} took ${end - start}ms`);
+        if (flag(logs, Flags.POSTS_DEBUG)) console.log(`[D] Fetch ${url} took ${end - start}ms`);
 
         if (!res.ok) throw new Error(`Danbooru error: ${res.status}`);
         const posts = await res.json();
@@ -96,7 +121,7 @@ app.get("/posts.json", async (req, res) => {
         const start = Date.now();
         const result = await getFilteredPage(tags, clientPage);
         const end = Date.now();
-        console.log(`getFilteredPage took ${end - start}ms`);
+        if (flag(logs, Flags.POSTS)) console.log(`[J] getFilteredPage took ${end - start}ms`);
 
         res.setHeader("Access-Control-Allow-Origin", "*");
         return result;
@@ -107,13 +132,13 @@ app.get("/posts.json", async (req, res) => {
 });
 
 app.all("*", async (req, res) => {
-    console.log(`Proxying ${req.url}`);
+    if (flag(logs, Flags.REDIRECT)) console.log(`[P] Proxying ${req.url}`);
 
     const url = `${DANBOORU_API}${req.url}`;
     const start = Date.now();
     const proxied = await ky(url);
     const end = Date.now();
-    console.log(`Proxy ${url} took ${end - start}ms`);
+    if (flag(logs, Flags.REDIRECT)) console.log(`[P] Proxy ${url} took ${end - start}ms`);
 
     const body = await proxied.text();
     const filename = url.split("?")[0].split("/").pop();
