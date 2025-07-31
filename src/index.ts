@@ -1,7 +1,5 @@
+import { AnotherCache } from "@wxn0brp/ac";
 import FalconFrame from "@wxn0brp/falcon-frame";
-import { getContentType } from "@wxn0brp/falcon-frame/helpers";
-import ky from "ky";
-import NodeCache from "node-cache";
 
 const DANBOORU_API = "https://danbooru.donmai.us";
 const TAG_LIMIT = +process.env.TAG_LIMIT || 2;
@@ -36,13 +34,10 @@ if (logs.length < 3) logs = logs.padEnd(3, "0");
 
 const app = new FalconFrame();
 
-const cache = new NodeCache({
-    stdTTL: 60 * 30,
-    checkperiod: 60 * 15
-});
+const cache = new AnotherCache<number>();
 
 /**
- * Get a page of posts from Danbooru, filtered by the given tags.
+ * Get a page of posts from booru server, filtered by the given tags.
  *
  * @param allTags - The tags to filter by. The first `TAG_LIMIT` tags are used
  * as the primary tags, and any additional tags are treated as secondary tags.
@@ -57,12 +52,13 @@ async function getFilteredPage(allTags: string[], clientPage: number): Promise<a
     const offset = (clientPage - 1) * LOCAL_PAGE_SIZE;
 
     // Start by fetching the page that the user requested
-    let danbooruPage = clientPage;
+    let page = clientPage;
 
     // If the user has already fetched previous pages, use the cached result page offset
-    const cacheKey = `${allTags.join(',')}::${clientPage-1}`;
+    const allTagsKey = allTags.join(',') + "::";
+    const cacheKey = allTagsKey + (clientPage - 1);
     if (cache.has(cacheKey)) {
-        danbooruPage = +cache.get(cacheKey);
+        page = cache.get(cacheKey);
     }
 
     let collected: any[] = [];
@@ -70,15 +66,15 @@ async function getFilteredPage(allTags: string[], clientPage: number): Promise<a
     while (true) {
         const query = new URLSearchParams({
             tags: primaryTags.join(" "),
-            page: danbooruPage.toString(),
+            page: page.toString(),
             limit: PAGE_LIMIT.toString()
         });
 
         const url = `${DANBOORU_API}/posts.json?${query}`;
-        if (flag(logs, Flags.POSTS_DEBUG)) console.log(`[D] Fetching page ${danbooruPage} of ${primaryTags.join(",")}`);
+        if (flag(logs, Flags.POSTS_DEBUG)) console.log(`[D] Fetching page ${page} of ${primaryTags.join(",")}`);
 
         const start = Date.now();
-        const res = await ky(url);
+        const res = await fetch(url);
         const end = Date.now();
         if (flag(logs, Flags.POSTS_DEBUG)) console.log(`[D] Fetch ${url} took ${end - start}ms`);
 
@@ -97,12 +93,12 @@ async function getFilteredPage(allTags: string[], clientPage: number): Promise<a
 
         if (collected.length >= offset + LOCAL_PAGE_SIZE) break;
         if (posts.length < PAGE_LIMIT) break;
-        danbooruPage++;
+        page++;
     }
 
     // If we've fetched more pages than the user requested, cache the result
-    if (danbooruPage > clientPage) {
-        cache.set(`${allTags.join(',')}::${clientPage}`, danbooruPage);
+    if (page > clientPage) {
+        cache.set(allTagsKey + clientPage, page);
     }
 
     // Return only the interesting page
@@ -133,23 +129,7 @@ app.get("/posts.json", async (req, res) => {
 
 app.all("*", async (req, res) => {
     if (flag(logs, Flags.REDIRECT)) console.log(`[P] Proxying ${req.url}`);
-
-    const url = `${DANBOORU_API}${req.url}`;
-    const start = Date.now();
-    const proxied = await ky(url);
-    const end = Date.now();
-    if (flag(logs, Flags.REDIRECT)) console.log(`[P] Proxy ${url} took ${end - start}ms`);
-
-    const body = await proxied.text();
-    const filename = url.split("?")[0].split("/").pop();
-
-    res.status(proxied.status);
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Content-Type", proxied.headers.get("Content-Type") || getContentType(filename) || "text/plain");
-    res.end(body);
+    res.redirect(req.url);
 });
 
-app.listen(port, () => {
-    console.log(`Danbooru smart-filter proxy running on http://localhost:${port}`);
-});
-
+app.listen(port, true);

@@ -12,13 +12,11 @@
         "bun": "bun run src/index.ts"
     },
     "devDependencies": {
-        "@types/node": "^22.12.0",
-        "tsc-alias": "^1.8.10",
+        "@types/node": "^24.1.0",
         "typescript": "^5.7.3"
     },
     "dependencies": {
-        "@wxn0brp/falcon-frame": "^0.0.14",
-        "ky": "^1.8.1",
-        "node-cache": "^5.1.2"
+        "@wxn0brp/ac": "^0.0.1",
+        "@wxn0brp/falcon-frame": "^0.0.20"
     }
 }
