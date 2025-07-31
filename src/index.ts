@@ -1,10 +1,11 @@
 import { AnotherCache } from "@wxn0brp/ac";
 import FalconFrame from "@wxn0brp/falcon-frame";
 
-const DANBOORU_API = "https://danbooru.donmai.us";
+const SERVER_URL = process.env.SERVER_URL || "https://danbooru.donmai.us";
 const TAG_LIMIT = +process.env.TAG_LIMIT || 2;
 const PAGE_LIMIT = +process.env.PAGE_LIMIT || 200;
-const LOCAL_PAGE_SIZE = +process.env.LOCAL_PAGE_SIZE || 2;
+const LOCAL_PAGE_SIZE = +process.env.LOCAL_PAGE_SIZE || 30;
+const MAX_EMPTY_CHECK = +process.env.MAX_EMPTY_CHECK || 10;
 const port = +process.argv[3] || +process.env.PORT || 14569;
 
 function flag(n: string, bit: Flags): boolean {
@@ -51,54 +52,111 @@ async function getFilteredPage(allTags: string[], clientPage: number): Promise<a
 
     const offset = (clientPage - 1) * LOCAL_PAGE_SIZE;
 
-    // Start by fetching the page that the user requested
-    let page = clientPage;
+    // Cache key with preserved order, but normalized
+    const tagsKey = allTags.map(tag => tag.trim().toLowerCase()).join("||");
+    const cacheKeyPrefix = `v2:tags:${tagsKey}::`;
+    const cacheStartKey = cacheKeyPrefix + `startPage:${clientPage}`;
 
-    // If the user has already fetched previous pages, use the cached result page offset
-    const allTagsKey = allTags.join(',') + "::";
-    const cacheKey = allTagsKey + (clientPage - 1);
-    if (cache.has(cacheKey)) {
-        page = cache.get(cacheKey);
+    // Get the page to start from
+    let apiPage = clientPage;
+    if (cache.has(cacheStartKey)) {
+        const cachedPage = cache.get(cacheStartKey);
+        if (typeof cachedPage === "number" && cachedPage >= 1) {
+            apiPage = cachedPage;
+        }
     }
 
     let collected: any[] = [];
+    let consecutiveEmptyPages = 0;
 
-    while (true) {
+    while (collected.length < offset + LOCAL_PAGE_SIZE) {
         const query = new URLSearchParams({
             tags: primaryTags.join(" "),
-            page: page.toString(),
-            limit: PAGE_LIMIT.toString()
+            page: apiPage.toString(),
+            limit: PAGE_LIMIT.toString(),
         });
 
-        const url = `${DANBOORU_API}/posts.json?${query}`;
-        if (flag(logs, Flags.POSTS_DEBUG)) console.log(`[D] Fetching page ${page} of ${primaryTags.join(",")}`);
+        const url = `${SERVER_URL}/posts.json?${query}`;
+        if (flag(logs, Flags.POSTS_DEBUG)) {
+            console.log(`[D] Fetching API page ${apiPage} for: ${primaryTags.join(", ")}`);
+        }
 
         const start = Date.now();
-        const res = await fetch(url);
+        let res: Response;
+        try {
+            res = await fetch(url, { signal: AbortSignal.timeout(10000) }); // 10s timeout
+        } catch (err) {
+            if (err.name === "AbortError") {
+                console.warn(`[!] Timeout fetching page ${apiPage}, skipping...`);
+                apiPage++;
+                continue;
+            }
+            throw err;
+        }
         const end = Date.now();
-        if (flag(logs, Flags.POSTS_DEBUG)) console.log(`[D] Fetch ${url} took ${end - start}ms`);
+        if (flag(logs, Flags.POSTS_DEBUG)) {
+            console.log(`[D] Fetch took ${end - start}ms`);
+        }
 
-        if (!res.ok) throw new Error(`Danbooru error: ${res.status}`);
-        const posts = await res.json();
+        // Handle 403/401 – no access to page (premium)
+        if (!res.ok) {
+            if (res.status === 403 || res.status === 401) {
+                if (flag(logs, Flags.POSTS_DEBUG)) {
+                    console.warn(`[!] Page ${apiPage} blocked (auth/premium), skipping...`);
+                }
+                apiPage++;
+                continue;
+            }
+            // Other errors (500, 404 etc.) – better to throw an error
+            throw new Error(`Server error: ${res.status} ${res.statusText}`);
+        }
 
-        // If there are no posts, we're done
-        if (!Array.isArray(posts) || posts.length === 0) break;
+        let posts: { id: number; tag_string: string }[];
+        try {
+            posts = await res.json();
+        } catch (err) {
+            console.warn(`[!] JSON parse error on page ${apiPage}, skipping...`);
+            apiPage++;
+            continue;
+        }
 
-        // Filter the posts by the secondary tags
-        const filtered = posts.filter(post =>
-            filterTags.every(tag => post.tag_string.includes(tag))
-        );
+        if (!Array.isArray(posts)) {
+            console.warn(`[!] Invalid response format on page ${apiPage}`);
+            apiPage++;
+            continue;
+        }
+
+        if (posts.length === 0) {
+            consecutiveEmptyPages++;
+            if (consecutiveEmptyPages >= MAX_EMPTY_CHECK) {
+                break; // Really end
+            }
+            apiPage++;
+            continue;
+        }
+
+        // Reset empty pages counter
+        consecutiveEmptyPages = 0;
+
+        // Filter posts by additional tags – exact match
+        const filtered = posts.filter(post => {
+            const postTags = post.tag_string.split(" ").map(t => t.trim());
+            return filterTags.every(tag => {
+                const normalizedTag = tag.trim().toLowerCase();
+                return postTags.map(t => t.toLowerCase()).includes(normalizedTag);
+            });
+        });
 
         collected.push(...filtered);
-
-        if (collected.length >= offset + LOCAL_PAGE_SIZE) break;
-        if (posts.length < PAGE_LIMIT) break;
-        page++;
+        apiPage++;
     }
 
-    // If we've fetched more pages than the user requested, cache the result
-    if (page > clientPage) {
-        cache.set(allTagsKey + clientPage, page);
+    // Cache: remember that client page `clientPage` starts from approx. API page
+    // Only if we moved forward
+    if (apiPage > clientPage) {
+        // Store safe offset – e.g. 5 pages back, to not skip
+        const safeStart = Math.max(1, apiPage - 10);
+        cache.set(cacheStartKey, safeStart);
     }
 
     // Return only the interesting page
@@ -129,7 +187,7 @@ app.get("/posts.json", async (req, res) => {
 
 app.all("*", async (req, res) => {
     if (flag(logs, Flags.REDIRECT)) console.log(`[P] Proxying ${req.url}`);
-    res.redirect(req.url);
+    res.redirect(SERVER_URL + req.url);
 });
 
 app.listen(port, true);
