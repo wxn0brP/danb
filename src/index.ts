@@ -30,7 +30,7 @@ if (process.argv.includes("-h")) {
     process.exit(0);
 }
 
-let logs = process.argv[2] || process.env.LOGS || "0";
+let logs = process.argv[2] || process.env.LOGS || "110";
 if (logs.length < 3) logs = logs.padEnd(3, "0");
 
 const app = new FalconFrame();

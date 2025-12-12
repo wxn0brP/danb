@@ -1,5 +1,5 @@
 {
-    "name": "danb",
+    "name": "@wxn0brp/danb",
     "version": "0.0.1",
     "main": "dist/index.js",
     "author": "wxn0brP",
@@ -7,7 +7,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "tsc && tsc-alias",
+        "build": "tsc",
         "start": "node dist/index.js",
         "bun": "bun run src/index.ts"
     },
