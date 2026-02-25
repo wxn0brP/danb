@@ -7,16 +7,15 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "tsc",
-        "start": "node dist/index.js",
-        "bun": "bun run src/index.ts"
+        "build": "npx tsc && npx tsc-alias",
+        "start": "node dist/index.js"
     },
     "devDependencies": {
         "@types/node": "*",
         "typescript": "*"
     },
     "dependencies": {
-        "@wxn0brp/ac": ">=0.0.3",
-        "@wxn0brp/falcon-frame": ">=0.5.4"
+        "@wxn0brp/ac": "~0.0.3",
+        "@wxn0brp/falcon-frame": "~0.7.0"
     }
 }

@@ -2,9 +2,19 @@
 
 A proxy server for the Danbooru API that filters posts by tags and provides a paginated API.
 
+Node:
+
 ```bash
-yarn
-yarn start
+npm i
+npm run build
+node .
+```
+
+Bun:
+
+```bash
+bun i
+bun run src/index.ts
 ```
 
 The server will be available at `http://localhost:14569`.

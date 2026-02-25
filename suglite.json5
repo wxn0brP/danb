@@ -1,0 +1,10 @@
+{
+    cmd: "tsc --noEmit && bun run src/index.ts 111",
+    watch: [
+        "src",
+    ],
+    restart_cmd: "clear",
+    events: {
+        rs: "clear",
+    },
+}
