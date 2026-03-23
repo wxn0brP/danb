@@ -12,7 +12,7 @@
     },
     "devDependencies": {
         "@types/node": "*",
-        "typescript": "^5"
+        "typescript": "^6.0.0"
     },
     "dependencies": {
         "@wxn0brp/ac": "~0.0.3",
