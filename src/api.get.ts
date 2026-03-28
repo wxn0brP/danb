@@ -95,12 +95,19 @@ export async function getFilteredPage(allTags: string[], clientPage: number, pre
         // Reset empty pages counter
         consecutiveEmptyPages = 0;
 
-        // Filter posts by additional tags – exact match
+        // Filter posts
         const filtered = posts.filter(post => {
-            const postTags = post.tag_string.split(" ").map(t => t.trim());
+            const postTags = post.tag_string
+                .split(" ")
+                .map(t => t.trim().toLowerCase());
+
             return filterTags.every(tag => {
                 const normalizedTag = tag.trim().toLowerCase();
-                return postTags.map(t => t.toLowerCase()).includes(normalizedTag);
+
+                if (normalizedTag.startsWith("-"))
+                    return !postTags.includes(normalizedTag.slice(1));
+                else
+                    return postTags.includes(normalizedTag);
             });
         });
 

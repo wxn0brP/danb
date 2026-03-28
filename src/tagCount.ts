@@ -28,11 +28,14 @@ async function getTagPostCount(tagName: string): Promise<number> {
 export async function sortTags(tags: string[]): Promise<string[]> {
     const orderTags: string[] = [];
     const otherTags: Array<{ tag: string; count: number }> = [];
+    const negativeTags: string[] = [];
 
     for (const tag of tags) {
         const trimmed = tag.trim();
         if (trimmed.toLowerCase().startsWith("order:")) {
             orderTags.push(trimmed);
+        } else if (trimmed.startsWith("-")) {
+            negativeTags.push(trimmed);
         } else {
             const count = await getTagPostCount(trimmed);
             otherTags.push({ tag: trimmed, count });
@@ -40,5 +43,7 @@ export async function sortTags(tags: string[]): Promise<string[]> {
     }
 
     otherTags.sort((a, b) => a.count - b.count);
-    return [...orderTags, ...otherTags.map(t => t.tag)];
+    negativeTags.sort();
+
+    return [...orderTags, ...otherTags.map(t => t.tag), ...negativeTags];
 }

@@ -46,6 +46,8 @@ app.get("/autocomplete.json", (req, res) => {
     res.redirect(SERVER_URL + url);
 });
 
+app.get("/", () => "Server is running.");
+
 app.all("*", async (req, res) => {
     if (flag(logs, Flags.REDIRECT))
         console.log(`[X] Proxying ${req.url}`);
