@@ -2,6 +2,7 @@ import { AnotherCache } from "@wxn0brp/ac";
 import { fetchApiPage } from "./api.utils";
 import { LOCAL_PAGE_SIZE, MAX_EMPTY_CHECK, TAG_LIMIT } from "./vars";
 import { sortTags } from "./tagCount";
+import { filterPosts, getAndTags } from "./filter";
 
 const cache = new AnotherCache<number>();
 cache._ttl = 60 * 60 * 1000;
@@ -33,7 +34,8 @@ function queuePrefetch(tags: string[], sortedTags: string[], clientPage: number)
 }
 
 export async function getFilteredPage(allTags: string[], clientPage: number, prefetch = false): Promise<Object[]> {
-    const sortedTags = await sortTags(allTags);
+    const andTags = getAndTags(allTags);
+    const sortedTags = await sortTags(andTags);
     const cachePrefix = `${sortedTags.join("|")}:`;
 
     if (!prefetch && !prefetchData.end) {
@@ -59,7 +61,6 @@ export async function getFilteredPage(allTags: string[], clientPage: number, pre
     }
 
     const primaryTags = sortedTags.slice(0, TAG_LIMIT);
-    const filterTags = sortedTags.slice(TAG_LIMIT);
 
     let apiPage = cache.get(`${cachePrefix}${clientPage - 1}`) || clientPage;
     const startPage = apiPage;
@@ -92,24 +93,9 @@ export async function getFilteredPage(allTags: string[], clientPage: number, pre
             lastRealPage = apiPage;
         }
 
-        // Reset empty pages counter
         consecutiveEmptyPages = 0;
 
-        // Filter posts
-        const filtered = posts.filter(post => {
-            const postTags = post.tag_string
-                .split(" ")
-                .map(t => t.trim().toLowerCase());
-
-            return filterTags.every(tag => {
-                const normalizedTag = tag.trim().toLowerCase();
-
-                if (normalizedTag.startsWith("-"))
-                    return !postTags.includes(normalizedTag.slice(1));
-                else
-                    return postTags.includes(normalizedTag);
-            });
-        });
+        const filtered = posts.filter(filterPosts(allTags));
 
         collected.push(...filtered);
         apiPage++;

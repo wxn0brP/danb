@@ -7,7 +7,7 @@ if (process.argv.includes("-h")) await import("./help");
 app.get("/posts.json", async (req, res, next) => {
     const tags = decodeURIComponent(req.query.tags as string)
         .trim()
-        .split(/\s+/)
+        .split(/[\s,]+/)
         .filter(Boolean);
 
     if (tags.length === 0) return [];
@@ -32,18 +32,6 @@ app.get("/posts.json", async (req, res, next) => {
         console.error(err);
         res.status(500).end("Error fetching or filtering posts");
     }
-});
-
-app.get("/autocomplete.json", (req, res) => {
-    const searchQuery = req.query["search[query]"];
-
-    req.query["search[query]"] = `*${searchQuery}*`.replaceAll("**", "*");
-
-    const url = "/autocomplete.json?" + new URLSearchParams(req.query).toString();
-
-    if (flag(logs, Flags.REDIRECT))
-        console.log(`[X] Proxying ${url}`);
-    res.redirect(SERVER_URL + url);
 });
 
 app.get("/", () => "Server is running.");

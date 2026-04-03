@@ -30,6 +30,11 @@ Get a page of posts filtered by tags.
 *   `tags`: A space-separated list of tags to filter by.
 *   `page`: The page number to retrieve.
 
+**Additional Tag Filtering Syntax:**
+
+*   **OR**: `tag1 tag2 tag3 tag4 O` -> tag1 AND tag2 AND (tag3 OR tag4)
+*   **Chained OR**: `tag1 tag2 tag3 tag4 O O` -> tag1 AND (tag2 OR tag3 OR tag4)
+
 ## Configuration
 
 The server can be configured using environment variables.
