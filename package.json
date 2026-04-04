@@ -16,6 +16,6 @@
     },
     "dependencies": {
         "@wxn0brp/ac": "~0.0.3",
-        "@wxn0brp/falcon-frame": "~0.7.0"
+        "@wxn0brp/falcon-frame": "~0.8.0"
     }
 }
