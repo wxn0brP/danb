@@ -11,11 +11,11 @@
         "start": "node dist/index.js"
     },
     "devDependencies": {
-        "@types/node": "*",
-        "typescript": "^5"
+        "@types/bun": "*",
+        "typescript": "^6"
     },
     "dependencies": {
-        "@wxn0brp/ac": "~0.0.3",
-        "@wxn0brp/falcon-frame": "~0.7.0"
+        "@wxn0brp/ac": "^0.0.3",
+        "@wxn0brp/falcon-frame": "^0.8.2"
     }
 }

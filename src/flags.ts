@@ -1,4 +1,3 @@
-
 export function flag(n: string, bit: Flags): boolean {
     return n[bit] === "1";
 }

@@ -1,7 +1,20 @@
+import { AnotherCache } from "@wxn0brp/ac";
 import { flag, Flags } from "./flags";
 import { logs, PAGE_LIMIT, SERVER_URL } from "./vars";
 
-export async function fetchApiPage(apiPage: number, tags: string[]) {
+export interface Post {
+    id: number;
+    tag_string: string;
+}
+
+const cache = new AnotherCache<Post[]>();
+cache._ttl = 10 * 60 * 1000; // 10 minutes
+
+export async function fetchApiPage(apiPage: number, tags: string[]): Promise<Post[]> {
+    const cacheKey = `${apiPage}:${tags.join("|")}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+
     const query = new URLSearchParams({
         tags: tags.join(" "),
         page: apiPage.toString(),
@@ -9,9 +22,8 @@ export async function fetchApiPage(apiPage: number, tags: string[]) {
     });
 
     const url = `${SERVER_URL}/posts.json?${query}`;
-    if (flag(logs, Flags.POSTS_DEBUG)) {
+    if (flag(logs, Flags.POSTS_DEBUG))
         console.log(`[A] Fetching API page ${apiPage} for: ${tags}`);
-    }
 
     const start = Date.now();
     let res: Response;
@@ -29,7 +41,6 @@ export async function fetchApiPage(apiPage: number, tags: string[]) {
         console.log(`[A] Fetch took ${end - start}ms`);
     }
 
-    // Handle 403/401 – no access to page (premium)
     if (!res.ok) {
         if (res.status === 403 || res.status === 401) {
             if (flag(logs, Flags.POSTS_DEBUG)) {
@@ -37,22 +48,24 @@ export async function fetchApiPage(apiPage: number, tags: string[]) {
             }
             return [];
         }
-        // Other errors (500, 404 etc.) – better to throw an error
         throw new Error(`Server error: ${res.status} ${res.statusText}`);
     }
 
-    let posts: { id: number; tag_string: string }[];
+    let posts: Post[];
     try {
         posts = await res.json();
     } catch (err) {
         console.warn(`[A] JSON parse error on page ${apiPage}, skipping...`);
-        return []
+        cache.set(cacheKey, [], 60_000);
+        return [];
     }
 
     if (!Array.isArray(posts)) {
         console.warn(`[A] Invalid response format on page ${apiPage}`);
+        cache.set(cacheKey, [], 60_000);
         return [];
     }
 
+    cache.set(cacheKey, posts);
     return posts;
 }
