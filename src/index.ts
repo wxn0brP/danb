@@ -10,7 +10,6 @@ app.get("/posts.json", async (req, res, next) => {
         .split(/[\s,]+/)
         .filter(Boolean);
 
-    if (tags.length === 0) return [];
     if (tags.length <= 2) return next();
 
     const clientPage = Math.max(1, parseInt((req.query.page as string) || "1", 10));
