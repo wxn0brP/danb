@@ -1,8 +1,8 @@
 import { AnotherCache } from "@wxn0brp/ac";
 import { fetchApiPage } from "./api.utils";
-import { LOCAL_PAGE_SIZE, MAX_EMPTY_CHECK, TAG_LIMIT } from "./vars";
+import { createPostFilter, parseToQuery, selectApiTags } from "./filter";
 import { sortTags } from "./tagCount";
-import { filterPosts, getAndTags } from "./filter";
+import { LOCAL_PAGE_SIZE, MAX_EMPTY_CHECK, TAG_LIMIT } from "./vars";
 
 const cache = new AnotherCache<number>();
 cache._ttl = 60 * 60 * 1000;
@@ -34,8 +34,9 @@ function queuePrefetch(tags: string[], sortedTags: string[], clientPage: number)
 }
 
 export async function getFilteredPage(allTags: string[], clientPage: number, prefetch = false): Promise<Object[]> {
-    const andTags = getAndTags(allTags);
-    const sortedTags = await sortTags(andTags);
+    const apiTagPool = selectApiTags(allTags);
+    const hasTilde = apiTagPool.some(t => t.startsWith("~"));
+    const sortedTags = hasTilde ? apiTagPool : await sortTags(apiTagPool);
     const cachePrefix = `${sortedTags.join("|")}:`;
 
     if (!prefetch && !prefetchData.end) {
@@ -61,6 +62,11 @@ export async function getFilteredPage(allTags: string[], clientPage: number, pre
     }
 
     const primaryTags = sortedTags.slice(0, TAG_LIMIT);
+    const query = parseToQuery(allTags, primaryTags);
+    const postFilter = createPostFilter(query);
+    console.log(`[F] Query`);
+    console.dir(query, { depth: null });
+    console.dir(primaryTags);
 
     let apiPage = cache.get(`${cachePrefix}${clientPage - 1}`) || clientPage;
     const startPage = apiPage;
@@ -95,7 +101,7 @@ export async function getFilteredPage(allTags: string[], clientPage: number, pre
 
         consecutiveEmptyPages = 0;
 
-        const filtered = posts.filter(filterPosts(allTags));
+        const filtered = posts.filter(postFilter);
 
         collected.push(...filtered);
         apiPage++;
