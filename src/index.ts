@@ -1,6 +1,6 @@
 import { getFilteredPage } from "./api.get";
 import { flag, Flags } from "./flags";
-import { app, logs, port, SERVER_URL } from "./vars";
+import { app, logs, port, SERVER_URL, TAG_LIMIT } from "./vars";
 
 if (process.argv.includes("-h")) await import("./help");
 
@@ -10,7 +10,7 @@ app.get("/posts.json", async (req, res, next) => {
         .split(/[\s,]+/)
         .filter(Boolean);
 
-    if (tags.length <= 2) return next();
+    if (tags.length <= TAG_LIMIT) return next();
 
     const clientPage = Math.max(1, parseInt((req.query.page as string) || "1", 10));
 
