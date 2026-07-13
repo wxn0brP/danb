@@ -1,12 +1,10 @@
 import { AnotherCache } from "@wxn0brp/ac";
 import { SERVER_URL } from "./vars";
+import { isFreeMetaTag, isLimitedMetaTag } from "./filter";
 
 const cache = new AnotherCache<number>();
-cache._ttl = 60 * 60 * 1000;
+cache.options.ttl = 60 * 60 * 1000;
 
-/**
- * Fetch post_count for a tag from API.
- */
 async function getTagPostCount(tagName: string): Promise<number> {
     const cached = cache.get(tagName.toLowerCase());
     if (cached !== undefined) return cached;
@@ -22,20 +20,21 @@ async function getTagPostCount(tagName: string): Promise<number> {
     }
 }
 
-/**
- * Sort tags with "order:xxx" always first, rest sorted by post_count ascending.
- */
 export async function sortTags(tags: string[]): Promise<string[]> {
-    const orderTags: string[] = [];
+    const freeMeta: string[] = [];
+    const limitedMeta: string[] = [];
     const otherTags: Array<{ tag: string; count: number }> = [];
-    const negativeTags: string[] = [];
+    const negativeTags: Array<{ tag: string; count: number }> = [];
 
     for (const tag of tags) {
         const trimmed = tag.trim();
-        if (trimmed.toLowerCase().startsWith("order:")) {
-            orderTags.push(trimmed);
+        if (isFreeMetaTag(trimmed)) {
+            freeMeta.push(trimmed);
+        } else if (isLimitedMetaTag(trimmed)) {
+            limitedMeta.push(trimmed);
         } else if (trimmed.startsWith("-")) {
-            negativeTags.push(trimmed);
+            const count = await getTagPostCount(trimmed.slice(1));
+            negativeTags.push({ tag: trimmed, count });
         } else {
             const count = await getTagPostCount(trimmed);
             otherTags.push({ tag: trimmed, count });
@@ -43,7 +42,12 @@ export async function sortTags(tags: string[]): Promise<string[]> {
     }
 
     otherTags.sort((a, b) => a.count - b.count);
-    negativeTags.sort();
+    negativeTags.sort((a, b) => b.count - a.count);
 
-    return [...orderTags, ...otherTags.map(t => t.tag), ...negativeTags];
+    return [
+        ...freeMeta,
+        ...limitedMeta,
+        ...otherTags.map(t => t.tag),
+        ...negativeTags.map(t => t.tag)
+    ];
 }

@@ -1,4 +1,5 @@
 import { getFilteredPage } from "./api.get";
+import { groupTags, isFreeMetaTag } from "./filter";
 import { flag, Flags } from "./flags";
 import { app, logs, port, SERVER_URL, TAG_LIMIT } from "./vars";
 
@@ -10,7 +11,8 @@ app.get("/posts.json", async (req, res, next) => {
         .split(/[\s,]+/)
         .filter(Boolean);
 
-    if (tags.length <= TAG_LIMIT) return next();
+    const limitedCount = tags.filter(t => !isFreeMetaTag(t)).length;
+    if (limitedCount <= TAG_LIMIT) return next();
 
     const clientPage = Math.max(1, parseInt((req.query.page as string) || "1", 10));
 
@@ -28,8 +30,15 @@ app.get("/posts.json", async (req, res, next) => {
         res.setHeader("Access-Control-Allow-Origin", "*");
         return result;
     } catch (err) {
-        console.error(err);
-        res.status(500).end("Error fetching or filtering posts");
+        const msg = (err as Error)?.message || "";
+        if (msg.startsWith("[400] ")) {
+            console.warn(msg);
+            res.status(400).end(msg.slice(6));
+        }
+        else {
+            console.error(err);
+            res.status(500).end("Error fetching or filtering posts");
+        }
     }
 });
 

@@ -8,7 +8,7 @@ export interface Post {
 }
 
 const cache = new AnotherCache<Post[]>();
-cache._ttl = 10 * 60 * 1000; // 10 minutes
+cache.options.ttl = 10 * 60 * 1000; // 10 minutes
 
 export async function fetchApiPage(apiPage: number, tags: string[]): Promise<Post[]> {
     const cacheKey = `${apiPage}:${tags.join("|")}`;

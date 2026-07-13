@@ -5,10 +5,10 @@ import { sortTags } from "./tagCount";
 import { LOCAL_PAGE_SIZE, MAX_EMPTY_CHECK, TAG_LIMIT } from "./vars";
 
 const cache = new AnotherCache<number>();
-cache._ttl = 60 * 60 * 1000;
+cache.options.ttl = 60 * 60 * 1000;
 
 const unusedCache = new AnotherCache<Object[]>();
-unusedCache._ttl = 60 * 60 * 1000;
+unusedCache.options.ttl = 60 * 60 * 1000;
 
 const prefetchData = {
     key: "",
@@ -34,13 +34,19 @@ function queuePrefetch(tags: string[], sortedTags: string[], clientPage: number)
 }
 
 export async function getFilteredPage(allTags: string[], clientPage: number, prefetch = false): Promise<Object[]> {
-    const apiTagPool = selectApiTags(allTags);
-    const hasTilde = apiTagPool.some(t => t.startsWith("~"));
-    const sortedTags = hasTilde ? apiTagPool : await sortTags(apiTagPool);
-    const cachePrefix = `${sortedTags.join("|")}:`;
+    const { freeMeta, limitedMeta, regularTags } = selectApiTags(allTags);
+    const hasTilde = regularTags.some(t => t.startsWith("~"));
+    const sortedRegular = hasTilde ? regularTags : await sortTags(regularTags);
+    const availableSlots = Math.max(0, TAG_LIMIT - limitedMeta.length);
+    const primaryTags = [
+        ...freeMeta,
+        ...limitedMeta,
+        ...sortedRegular.slice(0, availableSlots)
+    ];
+    const cachePrefix = `${primaryTags.join("|")}:`;
 
     if (!prefetch && !prefetchData.end) {
-        if (prefetchData.key !== sortedTags.join("|")) {
+        if (prefetchData.key !== primaryTags.join("|")) {
             prefetchData.abort = true;
             await prefetchData.promise;
             prefetchData.abort = false;
@@ -56,12 +62,11 @@ export async function getFilteredPage(allTags: string[], clientPage: number, pre
         const { data } = prefetchData;
         prefetchData.data = null;
         setTimeout(() => {
-            queuePrefetch(sortedTags, sortedTags, clientPage);
+            queuePrefetch(primaryTags, primaryTags, clientPage);
         }, 10);
         return data;
     }
 
-    const primaryTags = sortedTags.slice(0, TAG_LIMIT);
     const query = parseToQuery(allTags, primaryTags);
     const postFilter = createPostFilter(query);
     console.log(`[F] Query`);
@@ -115,7 +120,7 @@ export async function getFilteredPage(allTags: string[], clientPage: number, pre
     unusedCache.set(`${cachePrefix}${clientPage}`, unused);
 
     if (!prefetch && lastRealPage - startPage > 2)
-        queuePrefetch(sortedTags, sortedTags, clientPage);
+        queuePrefetch(primaryTags, primaryTags, clientPage);
 
     if (prefetch) {
         prefetchData.end = true;
