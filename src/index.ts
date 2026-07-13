@@ -1,5 +1,5 @@
 import { getFilteredPage } from "./api.get";
-import { groupTags, isFreeMetaTag } from "./filter";
+import { isFreeMetaTag } from "./filter";
 import { flag, Flags } from "./flags";
 import { app, logs, port, SERVER_URL, TAG_LIMIT } from "./vars";
 

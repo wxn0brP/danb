@@ -2,18 +2,18 @@ import { hasFieldsAdvanced } from "@wxn0brp/db-core/utils/hasFieldsAdvanced";
 import { TAG_LIMIT } from "./vars";
 
 const FREE_META_PREFIXES = [
-    "order:", "score:", "id:", "date:", "age:", "md5:",
+    "score:", "id:", "date:", "age:", "md5:",
     "width:", "height:", "mpixels:", "filesize:", "filetype:",
     "duration:", "status:", "tagcount:", "parent:", "child:",
     "pixiv_id:", "pixiv:", "embedded:", "limit:"
 ];
 
-const LIMITED_META_PREFIXES = ["rating:", "user:", "source:", "ratio:"];
+const LIMITED_META_PREFIXES = ["order:", "rating:", "user:", "source:", "ratio:"];
 
 export function isMetaTag(tag: string): boolean {
     const lower = tag.toLowerCase();
     return FREE_META_PREFIXES.some(p => lower.startsWith(p)) ||
-           LIMITED_META_PREFIXES.some(p => lower.startsWith(p));
+        LIMITED_META_PREFIXES.some(p => lower.startsWith(p));
 }
 
 export function isFreeMetaTag(tag: string): boolean {
