@@ -48,6 +48,12 @@ export async function fetchApiPage(apiPage: number, tags: string[]): Promise<Pos
             }
             return [];
         }
+        if (res.status === 500) {
+            if (flag(logs, Flags.POSTS_DEBUG)) {
+                console.warn(`[A] Server error on page ${apiPage}, skipping...`);
+            }
+            return [];
+        }
         throw new Error(`Server error: ${res.status} ${res.statusText}`);
     }
 

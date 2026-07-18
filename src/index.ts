@@ -1,9 +1,12 @@
+import { createDebug } from "@wxn0brp/falcon-frame/debug";
 import { getFilteredPage } from "./api.get";
 import { isFreeMetaTag } from "./filter";
 import { flag, Flags } from "./flags";
 import { app, logs, port, SERVER_URL, TAG_LIMIT } from "./vars";
 
 if (process.argv.includes("-h")) await import("./help");
+
+app.use(createDebug());
 
 app.get("/posts.json", async (req, res, next) => {
     const tags = decodeURIComponent(req.query.tags as string)

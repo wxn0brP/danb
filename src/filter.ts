@@ -1,14 +1,36 @@
 import { hasFieldsAdvanced } from "@wxn0brp/db-core/utils/hasFieldsAdvanced";
-import { TAG_LIMIT } from "./vars";
+import { TAG_LIMIT, logs } from "./vars";
+import { flag, Flags } from "./flags";
 
 const FREE_META_PREFIXES = [
-    "score:", "id:", "date:", "age:", "md5:",
-    "width:", "height:", "mpixels:", "filesize:", "filetype:",
-    "duration:", "status:", "tagcount:", "parent:", "child:",
-    "pixiv_id:", "pixiv:", "embedded:", "limit:"
+    "rating:",
+    "score:",
+    "id:",
+    "date:",
+    "age:",
+    "md5:",
+    "width:",
+    "height:",
+    "mpixels:",
+    "filesize:",
+    "filetype:",
+    "duration:",
+    "status:",
+    "tagcount:",
+    "parent:",
+    "child:",
+    "pixiv_id:",
+    "pixiv:",
+    "embedded:",
+    "limit:",
 ];
 
-const LIMITED_META_PREFIXES = ["order:", "rating:", "user:", "source:", "ratio:"];
+const LIMITED_META_PREFIXES = [
+    "order:",
+    "user:",
+    "source:",
+    "ratio:",
+];
 
 export function isMetaTag(tag: string): boolean {
     const lower = tag.toLowerCase();
@@ -51,6 +73,9 @@ export function groupTags(tags: string[]) {
     for (const group of stack)
         if (group.length > 1 && group.some(t => t.startsWith("-")))
             throw new Error("[400] Negation (-) is not allowed inside OR groups");
+
+    if (flag(logs, Flags.TAGS))
+        console.log(`[T] groupTags:`, stack);
 
     return stack;
 }
@@ -171,16 +196,20 @@ export function selectApiTags(tags: string[]): SelectedTags {
         }
     }
 
+    let result: SelectedTags;
+
     if (andTags.length > 0 || notTags.length > 0)
-        return { freeMeta, limitedMeta, regularTags: [...andTags, ...notTags] };
-
-    if (orGroups.length === 1 && orGroups[0].length <= TAG_LIMIT) {
+        result = { freeMeta, limitedMeta, regularTags: [...andTags, ...notTags] };
+    else if (orGroups.length === 1 && orGroups[0].length <= TAG_LIMIT) {
         const orGroup = orGroups[0];
-        return { freeMeta, limitedMeta, regularTags: orGroup.map((t, i) => i === 0 ? t : `~${t}`) };
-    }
+        result = { freeMeta, limitedMeta, regularTags: orGroup.map((t, i) => i === 0 ? t : `~${t}`) };
+    } else if (freeMeta.length > 0 || limitedMeta.length > 0)
+        result = { freeMeta, limitedMeta, regularTags: [] };
+    else
+        throw new Error("No AND tags and OR group exceeds TAG_LIMIT");
 
-    if (freeMeta.length > 0 || limitedMeta.length > 0)
-        return { freeMeta, limitedMeta, regularTags: [] };
+    if (flag(logs, Flags.TAGS))
+        console.log(`[T] selectApiTags:`, result);
 
-    throw new Error("No AND tags and OR group exceeds TAG_LIMIT");
+    return result;
 }

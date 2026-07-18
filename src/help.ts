@@ -7,5 +7,5 @@ for (const key of Object.keys(Flags)) {
     flags += `{${key}}`;
 }
 console.log("Flags:", flags);
-console.log("E.g.:", "111,", "101,", "010");
+console.log("E.g.:", "1110,", "1010,", "0100");
 process.exit(0);

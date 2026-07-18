@@ -6,4 +6,5 @@ export enum Flags {
     POSTS,
     POSTS_DEBUG,
     REDIRECT,
+    TAGS,
 }

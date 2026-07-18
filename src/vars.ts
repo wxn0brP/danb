@@ -9,6 +9,6 @@ export const port = +process.argv[3] || +process.env.PORT || 14569;
 
 export const app = new FalconFrame();
 
-const defaultFlags = "110";
+const defaultFlags = "11111111";
 export let logs = process.argv[2] || process.env.LOGS || defaultFlags;
 logs = logs.padEnd(defaultFlags.length, "0");

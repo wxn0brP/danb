@@ -1,5 +1,6 @@
 import { AnotherCache } from "@wxn0brp/ac";
-import { SERVER_URL } from "./vars";
+import { SERVER_URL, logs } from "./vars";
+import { flag, Flags } from "./flags";
 import { isFreeMetaTag, isLimitedMetaTag } from "./filter";
 
 const cache = new AnotherCache<number>();
@@ -44,10 +45,20 @@ export async function sortTags(tags: string[]): Promise<string[]> {
     otherTags.sort((a, b) => a.count - b.count);
     negativeTags.sort((a, b) => b.count - a.count);
 
-    return [
+    const sorted = [
         ...freeMeta,
         ...limitedMeta,
         ...otherTags.map(t => t.tag),
         ...negativeTags.map(t => t.tag)
     ];
+
+    if (flag(logs, Flags.TAGS))
+        console.log(`[T] sortTags:`, {
+            freeMeta,
+            limitedMeta,
+            regular: otherTags.map(t => ({ tag: t.tag, count: t.count })),
+            negative: negativeTags.map(t => ({ tag: t.tag, count: t.count }))
+        });
+
+    return sorted;
 }
