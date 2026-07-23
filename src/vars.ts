@@ -1,6 +1,7 @@
 import FalconFrame from "@wxn0brp/falcon-frame";
 
-export const SERVER_URL = process.env.SERVER_URL || "https://danbooru.donmai.us";
+export const SERVER_URL =
+	process.env.SERVER_URL || "https://danbooru.donmai.us";
 export const TAG_LIMIT = +process.env.TAG_LIMIT || 2;
 export const PAGE_LIMIT = +process.env.PAGE_LIMIT || 200;
 export const LOCAL_PAGE_SIZE = +process.env.LOCAL_PAGE_SIZE || 30;

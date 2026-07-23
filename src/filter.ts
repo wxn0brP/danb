@@ -3,213 +3,258 @@ import { TAG_LIMIT, logs } from "./vars";
 import { flag, Flags } from "./flags";
 
 const FREE_META_PREFIXES = [
-    "rating:",
-    "score:",
-    "id:",
-    "date:",
-    "age:",
-    "md5:",
-    "width:",
-    "height:",
-    "mpixels:",
-    "filesize:",
-    "filetype:",
-    "duration:",
-    "status:",
-    "tagcount:",
-    "parent:",
-    "child:",
-    "pixiv_id:",
-    "pixiv:",
-    "embedded:",
-    "limit:",
+	"rating:",
+	"score:",
+	"id:",
+	"date:",
+	"age:",
+	"md5:",
+	"width:",
+	"height:",
+	"mpixels:",
+	"filesize:",
+	"filetype:",
+	"duration:",
+	"status:",
+	"tagcount:",
+	"parent:",
+	"child:",
+	"pixiv_id:",
+	"pixiv:",
+	"embedded:",
+	"limit:",
 ];
 
 const LIMITED_META_PREFIXES = [
-    "order:",
-    "user:",
-    "source:",
-    "ratio:",
+	"order:",
+	"user:",
+	"source:",
+	"ratio:",
 ];
 
 export function isMetaTag(tag: string): boolean {
-    const lower = tag.toLowerCase();
-    return FREE_META_PREFIXES.some(p => lower.startsWith(p)) ||
-        LIMITED_META_PREFIXES.some(p => lower.startsWith(p));
+	const lower = tag.toLowerCase();
+	return (
+		FREE_META_PREFIXES.some(p => lower.startsWith(p)) ||
+		LIMITED_META_PREFIXES.some(p => lower.startsWith(p))
+	);
 }
 
 export function isFreeMetaTag(tag: string): boolean {
-    const lower = tag.toLowerCase();
-    return FREE_META_PREFIXES.some(p => lower.startsWith(p));
+	const lower = tag.toLowerCase();
+	return FREE_META_PREFIXES.some(p => lower.startsWith(p));
 }
 
 export function isLimitedMetaTag(tag: string): boolean {
-    const lower = tag.toLowerCase();
-    return LIMITED_META_PREFIXES.some(p => lower.startsWith(p));
+	const lower = tag.toLowerCase();
+	return LIMITED_META_PREFIXES.some(p => lower.startsWith(p));
 }
 
 export function groupTags(tags: string[]) {
-    const stack: string[][] = [];
+	const stack: string[][] = [];
 
-    for (const tag of tags) {
-        if (tag.toLowerCase() === "o") {
-            if (stack.length < 2)
-                throw new Error(`[400] "O" requires at least 2 preceding groups`);
-            const last = stack.pop()!;
-            const secondLast = stack.pop()!;
-            stack.push([...secondLast, ...last]);
+	for (const tag of tags) {
+		if (tag.toLowerCase() === "o") {
+			if (stack.length < 2)
+				throw new Error(`[400] "O" requires at least 2 preceding groups`);
+			const last = stack.pop()!;
+			const secondLast = stack.pop()!;
+			stack.push([
+				...secondLast,
+				...last,
+			]);
+		} else if (tag.startsWith("~")) {
+			if (stack.length < 1)
+				throw new Error(`[400] "~" requires a preceding tag`);
+			const last = stack.pop()!;
+			stack.push([
+				...last,
+				tag.slice(1),
+			]);
+		} else {
+			stack.push([
+				tag,
+			]);
+		}
+	}
 
-        } else if (tag.startsWith("~")) {
-            if (stack.length < 1)
-                throw new Error(`[400] "~" requires a preceding tag`);
-            const last = stack.pop()!;
-            stack.push([...last, tag.slice(1)]);
+	for (const group of stack)
+		if (group.length > 1 && group.some(t => t.startsWith("-")))
+			throw new Error("[400] Negation (-) is not allowed inside OR groups");
 
-        } else {
-            stack.push([tag]);
-        }
-    }
+	if (flag(logs, Flags.TAGS)) console.log(`[T] groupTags:`, stack);
 
-    for (const group of stack)
-        if (group.length > 1 && group.some(t => t.startsWith("-")))
-            throw new Error("[400] Negation (-) is not allowed inside OR groups");
-
-    if (flag(logs, Flags.TAGS))
-        console.log(`[T] groupTags:`, stack);
-
-    return stack;
+	return stack;
 }
 
 export function parseToQuery(tags: string[], excludeTags?: string[]) {
-    const groups = groupTags(tags);
-    const andTags: string[] = [];
-    const orGroups: string[][] = [];
-    const notTags: string[] = [];
+	const groups = groupTags(tags);
+	const andTags: string[] = [];
+	const orGroups: string[][] = [];
+	const notTags: string[] = [];
 
-    for (const group of groups) {
-        const exclusions = group.filter(t => t.startsWith("-"));
-        const inclusions = group.filter(t => !t.startsWith("-"));
+	for (const group of groups) {
+		const exclusions = group.filter(t => t.startsWith("-"));
+		const inclusions = group.filter(t => !t.startsWith("-"));
 
-        if (group.length === 1) {
-            const tag = group[0];
-            if (tag.startsWith("-")) {
-                const inner = tag.slice(1);
-                if (isMetaTag(inner)) continue;
-                notTags.push(inner.toLowerCase());
-            } else if (isMetaTag(tag)) {
-                continue;
-            } else {
-                andTags.push(tag.toLowerCase());
-            }
-        } else {
-            const hasMeta = group.some(t => isMetaTag(t));
-            if (hasMeta) continue;
+		if (group.length === 1) {
+			const tag = group[0];
+			if (tag.startsWith("-")) {
+				const inner = tag.slice(1);
+				if (isMetaTag(inner)) continue;
+				notTags.push(inner.toLowerCase());
+			} else if (isMetaTag(tag)) {
+				// continue;
+			} else {
+				andTags.push(tag.toLowerCase());
+			}
+		} else {
+			const hasMeta = group.some(t => isMetaTag(t));
+			if (hasMeta) continue;
 
-            if (inclusions.length > 0)
-                orGroups.push(inclusions.map(t => t.toLowerCase()));
+			if (inclusions.length > 0)
+				orGroups.push(inclusions.map(t => t.toLowerCase()));
 
-            for (const excl of exclusions) {
-                const inner = excl.slice(1);
-                if (isMetaTag(inner)) continue;
-                notTags.push(inner.toLowerCase());
-            }
-        }
-    }
+			for (const excl of exclusions) {
+				const inner = excl.slice(1);
+				if (isMetaTag(inner)) continue;
+				notTags.push(inner.toLowerCase());
+			}
+		}
+	}
 
-    const excludeClean = excludeTags?.map(t => {
-        const clean = t.startsWith("~") ? t.slice(1) : t.startsWith("-") ? t.slice(1) : t;
-        return clean.toLowerCase();
-    });
+	const excludeClean = excludeTags?.map(t => {
+		const clean = t.startsWith("~")
+			? t.slice(1)
+			: t.startsWith("-")
+				? t.slice(1)
+				: t;
+		return clean.toLowerCase();
+	});
 
-    const remainingAnd = excludeClean
-        ? andTags.filter(t => !excludeClean.includes(t))
-        : andTags;
+	const remainingAnd = excludeClean
+		? andTags.filter(t => !excludeClean.includes(t))
+		: andTags;
 
-    const remainingOr = excludeClean
-        ? orGroups.map(g => g.filter(t => !excludeClean.includes(t))).filter(g => g.length > 0)
-        : orGroups;
+	const remainingOr = excludeClean
+		? orGroups
+				.map(g => g.filter(t => !excludeClean.includes(t)))
+				.filter(g => g.length > 0)
+		: orGroups;
 
-    const remainingNot = excludeClean
-        ? notTags.filter(t => !excludeClean.includes(t))
-        : notTags;
+	const remainingNot = excludeClean
+		? notTags.filter(t => !excludeClean.includes(t))
+		: notTags;
 
-    const conditions: object[] = [];
+	const conditions: object[] = [];
 
-    if (remainingAnd.length > 0)
-        conditions.push({ $arrincall: { tags: remainingAnd } });
+	if (remainingAnd.length > 0)
+		conditions.push({
+			$arrincall: {
+				tags: remainingAnd,
+			},
+		});
 
-    for (const orGroup of remainingOr)
-        conditions.push({ $arrinc: { tags: orGroup } });
+	for (const orGroup of remainingOr)
+		conditions.push({
+			$arrinc: {
+				tags: orGroup,
+			},
+		});
 
-    for (const notTag of remainingNot)
-        conditions.push({ $not: { $arrinc: { tags: [notTag] } } });
+	for (const notTag of remainingNot)
+		conditions.push({
+			$not: {
+				$arrinc: {
+					tags: [
+						notTag,
+					],
+				},
+			},
+		});
 
-    return conditions.length > 0 ?
-        { $and: conditions } :
-        {};
+	return conditions.length > 0
+		? {
+				$and: conditions,
+			}
+		: {};
 }
 
 export function createPostFilter(query: object) {
-    return (post: { tag_string: string }) => {
-        const tags = post.tag_string
-            .split(" ")
-            .map(t => t.trim().toLowerCase());
+	return (post: { tag_string: string }) => {
+		const tags = post.tag_string.split(" ").map(t => t.trim().toLowerCase());
 
-        const wrapper = { tags, ...post };
-        return hasFieldsAdvanced(wrapper, query);
-    };
+		const wrapper = {
+			tags,
+			...post,
+		};
+		return hasFieldsAdvanced(wrapper, query);
+	};
 }
 
 export interface SelectedTags {
-    freeMeta: string[];
-    limitedMeta: string[];
-    regularTags: string[];
+	freeMeta: string[];
+	limitedMeta: string[];
+	regularTags: string[];
 }
 
 export function selectApiTags(tags: string[]): SelectedTags {
-    const groups = groupTags(tags);
+	const groups = groupTags(tags);
 
-    const freeMeta: string[] = [];
-    const limitedMeta: string[] = [];
-    const andTags: string[] = [];
-    const orGroups: string[][] = [];
-    const notTags: string[] = [];
+	const freeMeta: string[] = [];
+	const limitedMeta: string[] = [];
+	const andTags: string[] = [];
+	const orGroups: string[][] = [];
+	const notTags: string[] = [];
 
-    for (const group of groups) {
-        if (group.length === 1) {
-            const tag = group[0];
-            if (tag.startsWith("-")) {
-                const inner = tag.slice(1);
-                if (isLimitedMetaTag(inner)) continue;
-                notTags.push(tag);
-            } else if (isFreeMetaTag(tag)) {
-                freeMeta.push(tag);
-            } else if (isLimitedMetaTag(tag)) {
-                limitedMeta.push(tag);
-            } else {
-                andTags.push(tag);
-            }
-        } else if (group.length > 1) {
-            const hasMeta = group.some(t => isMetaTag(t));
-            if (hasMeta) continue;
-            orGroups.push(group);
-        }
-    }
+	for (const group of groups) {
+		if (group.length === 1) {
+			const tag = group[0];
+			if (tag.startsWith("-")) {
+				const inner = tag.slice(1);
+				if (isLimitedMetaTag(inner)) continue;
+				notTags.push(tag);
+			} else if (isFreeMetaTag(tag)) {
+				freeMeta.push(tag);
+			} else if (isLimitedMetaTag(tag)) {
+				limitedMeta.push(tag);
+			} else {
+				andTags.push(tag);
+			}
+		} else if (group.length > 1) {
+			const hasMeta = group.some(t => isMetaTag(t));
+			if (hasMeta) continue;
+			orGroups.push(group);
+		}
+	}
 
-    let result: SelectedTags;
+	let result: SelectedTags;
 
-    if (andTags.length > 0 || notTags.length > 0)
-        result = { freeMeta, limitedMeta, regularTags: [...andTags, ...notTags] };
-    else if (orGroups.length === 1 && orGroups[0].length <= TAG_LIMIT) {
-        const orGroup = orGroups[0];
-        result = { freeMeta, limitedMeta, regularTags: orGroup.map((t, i) => i === 0 ? t : `~${t}`) };
-    } else if (freeMeta.length > 0 || limitedMeta.length > 0)
-        result = { freeMeta, limitedMeta, regularTags: [] };
-    else
-        throw new Error("No AND tags and OR group exceeds TAG_LIMIT");
+	if (andTags.length > 0 || notTags.length > 0)
+		result = {
+			freeMeta,
+			limitedMeta,
+			regularTags: [
+				...andTags,
+				...notTags,
+			],
+		};
+	else if (orGroups.length === 1 && orGroups[0].length <= TAG_LIMIT) {
+		const orGroup = orGroups[0];
+		result = {
+			freeMeta,
+			limitedMeta,
+			regularTags: orGroup.map((t, i) => (i === 0 ? t : `~${t}`)),
+		};
+	} else if (freeMeta.length > 0 || limitedMeta.length > 0)
+		result = {
+			freeMeta,
+			limitedMeta,
+			regularTags: [],
+		};
+	else throw new Error("No AND tags and OR group exceeds TAG_LIMIT");
 
-    if (flag(logs, Flags.TAGS))
-        console.log(`[T] selectApiTags:`, result);
+	if (flag(logs, Flags.TAGS)) console.log(`[T] selectApiTags:`, result);
 
-    return result;
+	return result;
 }
